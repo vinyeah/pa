@@ -319,7 +319,6 @@ dev_init()
     cJSON *json = NULL;
     cJSON *item = NULL;
     cJSON *obj = NULL;
-    char *out = NULL;
     int i = 0;
     struct json_map json_map[JSON_MAP_SIZE];
 
@@ -391,15 +390,10 @@ next:
             if(cJSON_GetArraySize(json_map[i].json) > 0){
                 //save to temp file
                 if(!(order_dev_json_str(TMP_DEV_FILE, json_map[i].json))){
-                    if(buf_to_file(TMP_DEV_FILE, out, strlen(out))){
-                        blog(LOG_ERR, "save json out file failed");
-                    } else {
-                        //generate to output dir
-                        if(putfile_to_output(TMP_DEV_FILE, PA_TYPE_SBZL, json_map[i].area)){
-                            blog(LOG_ERR, "failed to put file to putput");
-                        }
+                    //generate to output dir
+                    if(putfile_to_output(TMP_DEV_FILE, PA_TYPE_SBZL, json_map[i].area)){
+                        blog(LOG_ERR, "failed to put file to putput");
                     }
-                    free(out);
                 }
             }
             cJSON_Delete(json_map[i].json);
