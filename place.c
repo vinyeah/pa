@@ -100,8 +100,9 @@ place_init()
 
 #else
 
+#define PLACE_BATCH_NUM 100
 
-char *order_place_json_str(cJSON *json, long ori_len)
+char *order_place_json_str(cJSON *json, long ori_len, int id)
 {
     char *out = (char*)malloc(ori_len*2);
     cJSON *item = NULL;
@@ -118,6 +119,8 @@ char *order_place_json_str(cJSON *json, long ori_len)
     sprintf(out, "[");
     len ++;
     for(i = 0; i < size; i++){
+        if(i < id || i-id>PLACE_BATCH_NUM)
+            continue;
         if(!(item = cJSON_GetArrayItem(json, i))){
             blog(LOG_ERR, "get item %d fail", i);
             continue;
@@ -197,6 +200,8 @@ char *order_place_json_str(cJSON *json, long ori_len)
     sprintf(out + len, "]");
     return out;
 }
+
+
 int
 place_init()
 {
@@ -211,6 +216,8 @@ place_init()
     char *out = NULL;
     char *p = NULL;
     long len = 0;
+    int size = 0;
+    int i = 0;
 
 
     blog(LOG_DEBUG, "reading config from place dir:%s", cfg->data_path);
@@ -248,24 +255,27 @@ place_init()
         }
 
         if((json = cJSON_Parse(p))){
-            if((out = order_place_json_str(json, len))){
-                if(buf_to_file(TMP_PLACE_FILE, out, strlen(out))){
-                    blog(LOG_ERR, "save json out file failed");
-                } else {
-                    //if(putfile_to_output(buf, PA_TYPE_CSZL, entry->d_name)){
-                    if(putfile_to_output(TMP_PLACE_FILE, PA_TYPE_CSZL, entry->d_name)){
-                        blog(LOG_ERR, "failed to put file to putput");
+            size = cJSON_GetArraySize(json);
+            for(i = 0; i < size; i +=PLACE_BATCH_NUM){
+                if((out = order_place_json_str(json, len, i))){
+                    if(buf_to_file(TMP_PLACE_FILE, out, strlen(out))){
+                        blog(LOG_ERR, "save json out file failed");
                     } else {
-                        //generate to output dir
-                        sprintf(buf, "touch %s/"PLACE_DIR"/%s.ok", cfg->data_path, entry->d_name);
-                        call_system(buf);
+                        //if(putfile_to_output(buf, PA_TYPE_CSZL, entry->d_name)){
+                        if(putfile_to_output(TMP_PLACE_FILE, PA_TYPE_CSZL, entry->d_name)){
+                            blog(LOG_ERR, "failed to put file to putput");
+                        } else {
+                            //generate to output dir
+                            sprintf(buf, "touch %s/"PLACE_DIR"/%s.ok", cfg->data_path, entry->d_name);
+                            call_system(buf);
+                        }
                     }
+                    free(out);
+                } else {
+                    blog(LOG_ERR, "order json error");
                 }
-                free(out);
-            } else {
-                blog(LOG_ERR, "order json error");
-            }
-            cJSON_Delete(json);
+           }
+           cJSON_Delete(json);
         } else {
             blog(LOG_ERR, "parse json error");
         }
