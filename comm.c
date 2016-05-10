@@ -582,7 +582,7 @@ fail:
     }
     fread(s, 1, len, f);
     fclose(f);
-    s[len + 1] = 0;
+    s[len] = 0;
     if(len_out)
         *len_out = len;
     return s;

@@ -102,9 +102,9 @@ place_init()
 
 #define PLACE_BATCH_NUM 100
 
-char *order_place_json_str(cJSON *json, long ori_len, int id)
+char *order_place_json_str(cJSON *json, int id)
 {
-    char *out = (char*)malloc(ori_len*2);
+    char *out = (char*)malloc(1024*2*PLACE_BATCH_NUM);//ori_len*2);
     cJSON *item = NULL;
     int size = 0;
     int len = 0;
@@ -114,12 +114,13 @@ char *order_place_json_str(cJSON *json, long ori_len, int id)
         return NULL;
     }
 
+    blog(LOG_DEBUG, "id:%d", id);
     size = cJSON_GetArraySize(json);
     blog(LOG_DEBUG, "record items:%d", size);
     sprintf(out, "[");
     len ++;
     for(i = 0; i < size; i++){
-        if(i < id || i-id>PLACE_BATCH_NUM)
+        if(i < id || i-id + 1>PLACE_BATCH_NUM)
             continue;
         if(!(item = cJSON_GetArrayItem(json, i))){
             blog(LOG_ERR, "get item %d fail", i);
@@ -129,29 +130,30 @@ char *order_place_json_str(cJSON *json, long ori_len, int id)
             sprintf(out + len, ",");
             len ++;
         }
+
         len += sprintf(out + len, 
                 "{\"SERVICE_CODE\":\"%s\","
                 "\"SERVICE_NAME\":\"%s\","
-                "\"ADDRESS\":\"\","
-                "\"ZIP\":\"\","
+                "\"ADDRESS\":\"%s\","
+                "\"ZIP\":\"100000\","
                 "\"BUSINESS_NATURE\":\"%s\","
                 "\"PRINCIPAL\":\"\","
                 "\"PRINCIPAL_TEL\":\"\","
                 "\"INFOR_MAN\":\"\","
                 "\"INFOR_MAN_TEL\":\"\","
                 "\"INFOR_MAN_EMAIL\":\"\","
-                "\"PRODUCER_CODE\":\"\","
+                "\"PRODUCER_CODE\":\"06\","
                 "\"STATUS\":\"%s\","
-                "\"ENDING_NUMBER\":\"\","
-                "\"SERVER_NUMBER\":\"\","
+                "\"ENDING_NUMBER\":\"1\","
+                "\"SERVER_NUMBER\":\"1\","
                 "\"EXIT_IP\":\"\","
                 "\"AUTH_ACCOUNT\":\"\","
-                "\"NET_TYPE\":\"\","
+                "\"NET_TYPE\":\"08\","
                 "\"PRACTITIONER_NUMBER\":\"\","
                 "\"NET_MONITOR_DEPARTMENT\":\"\","
                 "\"NET_MONITOR_MAN\":\"\","
                 "\"NET_MONITOR_MAN_TEL\":\"\","
-                "\"REMARK\":\"\","
+                "\"REMARK\":\"%s\","
                 "\"SERVICE_TYPE\":\"%s\","
                 "\"PROVINCE_CODE\":\"%s\","
                 "\"CITY_CODE\":\"%s\","
@@ -164,7 +166,7 @@ char *order_place_json_str(cJSON *json, long ori_len, int id)
                 "\"YPOINT\":\"%s\","
                 "\"GIS_XPOINT\":\"\","
                 "\"GIS_YPOINT\":\"\","
-                "\"TERMINAL_FACTORY_ORGCODE\":\"\","
+                "\"TERMINAL_FACTORY_ORGCODE\":\"%s\","
                 "\"ORG_CODE\":\"\","
                 "\"IP_TYPE\":\"\","
                 "\"BAND_WIDTH\":\"\","
@@ -178,21 +180,24 @@ char *order_place_json_str(cJSON *json, long ori_len, int id)
                 "\"PERSON_TEL\":\"\","
                 "\"PERSON_QQ\":\"\","
                 "\"INFOR_MAN_QQ\":\"\","
-                "\"START_TIME\":\"\","
-                "\"END_TIME\":\"\","
+                "\"START_TIME\":\"8:00\","
+                "\"END_TIME\":\"18:00\","
                 "\"CREATE_TIME\":\"%s\","
                 "\"CAP_TYPE\":\"%s\""
                 "}",
                 (cJSON_GetObjectItem(item, "SERVICE_CODE"))->valuestring,
                 (cJSON_GetObjectItem(item, "SERVICE_NAME"))->valuestring,
+                (cJSON_GetObjectItem(item, "SERVICE_NAME"))->valuestring,
                 (cJSON_GetObjectItem(item, "BUSINESS_NATURE"))->valuestring,
                 (cJSON_GetObjectItem(item, "STATUS"))->valuestring,
+                cfg->org_code,
                 (cJSON_GetObjectItem(item, "SERVICE_TYPE"))->valuestring,
                 (cJSON_GetObjectItem(item, "PROVINCE_CODE"))->valuestring,
                 (cJSON_GetObjectItem(item, "CITY_CODE"))->valuestring,
                 (cJSON_GetObjectItem(item, "AREA_CODE"))->valuestring,
                 (cJSON_GetObjectItem(item, "XPOINT"))->valuestring,
                 (cJSON_GetObjectItem(item, "YPOINT"))->valuestring,
+                cfg->org_code,
                 (cJSON_GetObjectItem(item, "CREATE_TIME"))->valuestring,
                 (cJSON_GetObjectItem(item, "CAP_TYPE"))->valuestring
                 );
@@ -218,8 +223,11 @@ place_init()
     long len = 0;
     int size = 0;
     int i = 0;
+    int j = 0;
+    struct json_map json_map[JSON_MAP_SIZE];
 
 
+    memset(json_map, 0, sizeof(json_map));
     blog(LOG_DEBUG, "reading config from place dir:%s", cfg->data_path);
     sprintf(buf, "%s/%s", cfg->data_path, PLACE_DIR);
     if((dp = opendir(buf)) == NULL) {
@@ -249,40 +257,63 @@ place_init()
 
         sprintf(buf, "%s/"PLACE_DIR"/%s", cfg->data_path, entry->d_name);
 
+        blog(LOG_DEBUG, "loading:%s", buf);
         if(!(p = file_to_buf(buf, &len))){
             blog(LOG_ERR, "failed to load json file");
             continue;
         }
 
-        if((json = cJSON_Parse(p))){
-            size = cJSON_GetArraySize(json);
-            for(i = 0; i < size; i +=PLACE_BATCH_NUM){
-                if((out = order_place_json_str(json, len, i))){
-                    if(buf_to_file(TMP_PLACE_FILE, out, strlen(out))){
-                        blog(LOG_ERR, "save json out file failed");
-                    } else {
-                        //if(putfile_to_output(buf, PA_TYPE_CSZL, entry->d_name)){
-                        if(putfile_to_output(TMP_PLACE_FILE, PA_TYPE_CSZL, entry->d_name)){
-                            blog(LOG_ERR, "failed to put file to putput");
-                        } else {
-                            //generate to output dir
-                            sprintf(buf, "touch %s/"PLACE_DIR"/%s.ok", cfg->data_path, entry->d_name);
-                            call_system(buf);
-                        }
-                    }
-                    free(out);
-                } else {
-                    blog(LOG_ERR, "order json error");
-                }
-           }
-           cJSON_Delete(json);
-        } else {
-            blog(LOG_ERR, "parse json error");
+     //   blog(LOG_DEBUG, "load place from file: %s", p);
+        if(!(item = cJSON_Parse(p))){
+            goto next;
         }
 
-        free(p);
+        if(!(obj = cJSON_GetObjectItem(item, "CITY_CODE"))){
+            goto next;
+        }
+
+        if((json = get_json_map(json_map, obj->valuestring))){
+            cJSON_AddItemToArray(json, item); 
+        }
+
+        //generate to output dir
+        sprintf(buf, "touch %s/"PLACE_DIR"/%s.ok", cfg->data_path, entry->d_name);
+        call_system(buf);
+next:
+        if(p){
+            free(p);
+            p = NULL;
+        }
     }
     closedir(dp);
+
+    blog(LOG_DEBUG, "generate dest place file");
+
+    for(i = 0; i < JSON_MAP_SIZE; i ++){
+        if(!json_map[i].area[0])
+            continue;
+        blog(LOG_DEBUG, "handle json of :%s", json_map[i].area);
+        size = cJSON_GetArraySize(json_map[i].json);
+        if(size <= 0)
+            continue;
+
+        blog(LOG_DEBUG, "size:%d", size);
+        //save to temp file
+        for(j = 0; j < size; j += PLACE_BATCH_NUM){
+            if(!(out = order_place_json_str(json_map[i].json, j)))
+                continue;
+            if(buf_to_file(TMP_PLACE_FILE, out, strlen(out))){
+                blog(LOG_ERR, "save json out file failed");
+            } else {
+                if(putfile_to_output(TMP_PLACE_FILE, PA_TYPE_CSZL, json_map[i].area)){
+                    blog(LOG_ERR, "failed to put file to putput");
+                }
+            }
+            free(out);
+        }
+        cJSON_Delete(json_map[i].json);
+    }
+    blog(LOG_DEBUG, "place init finished");
     return 0;
 }
 

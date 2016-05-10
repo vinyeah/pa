@@ -22,6 +22,9 @@ putfile_to_output(char *src, char *type, char *src_id)
 
     blog(LOG_DEBUG, "adding file to output path");
 
+
+    printf("[%s][%s][%s]\n", src, type, src_id);
+
     sprintf(dbuf, "%s/"OUTPUT_DIR"/%s/", cfg->data_path, type);
     tm = localtime(&tt); 
     strftime(tbuf, sizeof(tbuf) - 1, "%Y%m%d%H%M%S", tm);

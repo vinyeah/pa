@@ -235,7 +235,10 @@ append_dev_data(cJSON *json)
     return 0;
 }
 
-int order_dev_json_str(char *fname, cJSON *json)
+
+#define DEV_BATCH_NUM 100
+
+int order_dev_json_str(char *fname, cJSON *json, int id)
 {
     FILE *f = NULL;
     cJSON *item = NULL;
@@ -254,11 +257,13 @@ int order_dev_json_str(char *fname, cJSON *json)
     blog(LOG_DEBUG, "record items:%d", size);
     fprintf(f, "[");
     for(i = 0; i < size; i++){
+        if(i < id || i-id + 1>DEV_BATCH_NUM)
+            continue;
         if(!(item = cJSON_GetArrayItem(json, i))){
             blog(LOG_ERR, "get item %d fail", i);
             continue;
         }
-        if(i){
+        if(i != id){
             fprintf(f, ",");
         }
         fprintf(f, 
@@ -321,6 +326,8 @@ dev_init()
     cJSON *obj = NULL;
     int i = 0;
     struct json_map json_map[JSON_MAP_SIZE];
+    int size = 0;
+    int j = 0;
 
     INIT_LIST_HEAD(&dev_list);
     rbtree_init(&dev_root, &dev_sentinel, mac_rbtree_insert_value);
@@ -387,9 +394,12 @@ next:
     for(i = 0; i < JSON_MAP_SIZE; i ++){
         if(json_map[i].area[0]){
             blog(LOG_DEBUG, "handle json of :%s", json_map[i].area);
-            if(cJSON_GetArraySize(json_map[i].json) > 0){
+            size = cJSON_GetArraySize(json_map[i].json);
+            if(size <= 0)
+                continue;
+            for(j = 0; j < size; j += DEV_BATCH_NUM){
                 //save to temp file
-                if(!(order_dev_json_str(TMP_DEV_FILE, json_map[i].json))){
+                if(!(order_dev_json_str(TMP_DEV_FILE, json_map[i].json, j))){
                     //generate to output dir
                     if(putfile_to_output(TMP_DEV_FILE, PA_TYPE_SBZL, json_map[i].area)){
                         blog(LOG_ERR, "failed to put file to putput");
