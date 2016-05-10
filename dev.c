@@ -235,41 +235,33 @@ append_dev_data(cJSON *json)
     return 0;
 }
 
-char *order_dev_json_str(cJSON *json)
+int order_dev_json_str(char *fname, cJSON *json)
 {
-    long ori_len = 1024*1024;
-    char *out = (char*)malloc(ori_len);
+    FILE *f = NULL;
     cJSON *item = NULL;
     int size = 0;
     int len = 0;
     int i = 0;
     char *t = NULL;
-    if(!out)
-        return NULL;
+
+    if(!(f = fopen(fname, "w"))){
+        blog(LOG_ERR, "file open error!");
+        return -1;
+
+    }
 
     size = cJSON_GetArraySize(json);
     blog(LOG_DEBUG, "record items:%d", size);
-    sprintf(out, "[");
-    len ++;
+    fprintf(f, "[");
     for(i = 0; i < size; i++){
         if(!(item = cJSON_GetArrayItem(json, i))){
             blog(LOG_ERR, "get item %d fail", i);
             continue;
         }
-        if(len < ori_len - 1024*2){
-            ori_len *= 2;
-            if(!(t = realloc(out, ori_len))){
-                blog(LOG_ERR, "oom");
-                free(out);
-                return NULL;
-            }
-            out = t;
-        }
         if(i){
-            sprintf(out + len, ",");
-            len ++;
+            fprintf(f, ",");
         }
-        len += sprintf(out + len, 
+        fprintf(f, 
                 "{\"EQUIPMENT_NUM\":\"%s\","
                 "\"EQUIPMENT_NAME\":\"%s\","
                 "\"MAC\":\"%s\","
@@ -311,8 +303,9 @@ char *order_dev_json_str(cJSON *json)
                 (cJSON_GetObjectItem(item, "CREATE_TIME"))->valuestring
                     );
     }
-    sprintf(out + len, "]");
-    return out;
+    fprintf(f, "]");
+    fclose(f);
+    return 0;
 }
 
 int
@@ -397,7 +390,7 @@ next:
             blog(LOG_DEBUG, "handle json of :%s", json_map[i].area);
             if(cJSON_GetArraySize(json_map[i].json) > 0){
                 //save to temp file
-                if((out = order_dev_json_str(json_map[i].json))){
+                if(!(order_dev_json_str(TMP_DEV_FILE, json_map[i].json))){
                     if(buf_to_file(TMP_DEV_FILE, out, strlen(out))){
                         blog(LOG_ERR, "save json out file failed");
                     } else {
