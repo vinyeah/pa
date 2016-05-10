@@ -125,7 +125,7 @@ char *order_place_json_str(cJSON *json, long ori_len, int id)
             blog(LOG_ERR, "get item %d fail", i);
             continue;
         }
-        if(i){
+        if(i != id){
             sprintf(out + len, ",");
             len ++;
         }
