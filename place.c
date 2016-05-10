@@ -100,6 +100,103 @@ place_init()
 
 #else
 
+
+char *order_place_json_str(cJSON *json, long ori_len)
+{
+    char *out = (char*)malloc(ori_len*2);
+    cJSON *item = NULL;
+    int size = 0;
+    int len = 0;
+    int i = 0;
+    if(!out){
+        blog(LOG_ERR, "oom");
+        return NULL;
+    }
+
+    size = cJSON_GetArraySize(json);
+    blog(LOG_DEBUG, "record items:%d", size);
+    sprintf(out, "[");
+    len ++;
+    for(i = 0; i < size; i++){
+        if(!(item = cJSON_GetArrayItem(json, i))){
+            blog(LOG_ERR, "get item %d fail", i);
+            continue;
+        }
+        if(i){
+            sprintf(out + len, ",");
+            len ++;
+        }
+        len += sprintf(out + len, 
+                "{\"SERVICE_CODE\":\"%s\","
+                "\"SERVICE_NAME\":\"%s\","
+                "\"ADDRESS\":\"\","
+                "\"ZIP\":\"\","
+                "\"BUSINESS_NATURE\":\"%s\","
+                "\"PRINCIPAL\":\"\","
+                "\"PRINCIPAL_TEL\":\"\","
+                "\"INFOR_MAN\":\"\","
+                "\"INFOR_MAN_TEL\":\"\","
+                "\"INFOR_MAN_EMAIL\":\"\","
+                "\"PRODUCER_CODE\":\"\","
+                "\"STATUS\":\"%s\","
+                "\"ENDING_NUMBER\":\"\","
+                "\"SERVER_NUMBER\":\"\","
+                "\"EXIT_IP\":\"\","
+                "\"AUTH_ACCOUNT\":\"\","
+                "\"NET_TYPE\":\"\","
+                "\"PRACTITIONER_NUMBER\":\"\","
+                "\"NET_MONITOR_DEPARTMENT\":\"\","
+                "\"NET_MONITOR_MAN\":\"\","
+                "\"NET_MONITOR_MAN_TEL\":\"\","
+                "\"REMARK\":\"\","
+                "\"SERVICE_TYPE\":\"%s\","
+                "\"PROVINCE_CODE\":\"%s\","
+                "\"CITY_CODE\":\"%s\","
+                "\"AREA_CODE\":\"%s\","
+                "\"CITY_TYPE\":\"\","
+                "\"POLICE_CODE\":\"\","
+                "\"MAIL_ACCOUNT\":\"\","
+                "\"MOBILE_ACCOUNT\":\"\","
+                "\"XPOINT\":\"%s\","
+                "\"YPOINT\":\"%s\","
+                "\"GIS_XPOINT\":\"\","
+                "\"GIS_YPOINT\":\"\","
+                "\"TERMINAL_FACTORY_ORGCODE\":\"\","
+                "\"ORG_CODE\":\"\","
+                "\"IP_TYPE\":\"\","
+                "\"BAND_WIDTH\":\"\","
+                "\"NET_LAN\":\"\","
+                "\"NET_LAN_TERMINAL\":\"\","
+                "\"IS_SAFE\":\"\","
+                "\"WIFI_TERMINAL\":\"\","
+                "\"PRINCIPAL_CERT_TYPE\":\"\","
+                "\"PRINCIPAL_CERT_CODE\":\"\","
+                "\"PERSON_NAME\":\"\","
+                "\"PERSON_TEL\":\"\","
+                "\"PERSON_QQ\":\"\","
+                "\"INFOR_MAN_QQ\":\"\","
+                "\"START_TIME\":\"\","
+                "\"END_TIME\":\"\","
+                "\"CREATE_TIME\":\"%s\","
+                "\"CAP_TYPE\":\"%s\""
+                "}",
+                (cJSON_GetObjectItem(item, "SERVICE_CODE"))->valuestring,
+                (cJSON_GetObjectItem(item, "SERVICE_NAME"))->valuestring,
+                (cJSON_GetObjectItem(item, "BUSINESS_NATURE"))->valuestring,
+                (cJSON_GetObjectItem(item, "STATUS"))->valuestring,
+                (cJSON_GetObjectItem(item, "SERVICE_TYPE"))->valuestring,
+                (cJSON_GetObjectItem(item, "PROVINCE_CODE"))->valuestring,
+                (cJSON_GetObjectItem(item, "CITY_CODE"))->valuestring,
+                (cJSON_GetObjectItem(item, "AREA_CODE"))->valuestring,
+                (cJSON_GetObjectItem(item, "XPOINT"))->valuestring,
+                (cJSON_GetObjectItem(item, "YPOINT"))->valuestring,
+                (cJSON_GetObjectItem(item, "CREATE_TIME"))->valuestring,
+                (cJSON_GetObjectItem(item, "CAP_TYPE"))->valuestring
+                );
+    }
+    sprintf(out + len, "]");
+    return out;
+}
 int
 place_init()
 {
@@ -109,8 +206,12 @@ place_init()
     struct stat statbuf;
     cJSON *json = NULL;
     cJSON *item = NULL;
+    cJSON *obj = NULL;
     char *ft = NULL;
     char *out = NULL;
+    char *p = NULL;
+    long len = 0;
+
 
     blog(LOG_DEBUG, "reading config from place dir:%s", cfg->data_path);
     sprintf(buf, "%s/%s", cfg->data_path, PLACE_DIR);
@@ -141,13 +242,35 @@ place_init()
 
         sprintf(buf, "%s/"PLACE_DIR"/%s", cfg->data_path, entry->d_name);
 
-        if(putfile_to_output(buf, PA_TYPE_CSZL, entry->d_name)){
-            blog(LOG_ERR, "failed to put file to putput");
-        } else {
-            //generate to output dir
-            sprintf(buf, "touch %s/"PLACE_DIR"/%s.ok", cfg->data_path, entry->d_name);
-            call_system(buf);
+        if(!(p = file_to_buf(buf, &len))){
+            blog(LOG_ERR, "failed to load json file");
+            continue;
         }
+
+        if((json = cJSON_Parse(p))){
+            if((out = order_place_json_str(json, len))){
+                if(buf_to_file(TMP_PLACE_FILE, out, strlen(out))){
+                    blog(LOG_ERR, "save json out file failed");
+                } else {
+                    //if(putfile_to_output(buf, PA_TYPE_CSZL, entry->d_name)){
+                    if(putfile_to_output(TMP_PLACE_FILE, PA_TYPE_CSZL, entry->d_name)){
+                        blog(LOG_ERR, "failed to put file to putput");
+                    } else {
+                        //generate to output dir
+                        sprintf(buf, "touch %s/"PLACE_DIR"/%s.ok", cfg->data_path, entry->d_name);
+                        call_system(buf);
+                    }
+                }
+                free(out);
+            } else {
+                blog(LOG_ERR, "order json error");
+            }
+            cJSON_Delete(json);
+        } else {
+            blog(LOG_ERR, "parse json error");
+        }
+
+        free(p);
     }
     closedir(dp);
     return 0;

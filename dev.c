@@ -10,6 +10,8 @@
 #include "crc.h"
 #include "cJSON.h"
 
+#define TMP_DEV_FILE  "/tmp/.pa_tmp_dev"
+
 extern struct app_config *cfg;
 rbtree_t dev_root;
 rbtree_node_t dev_sentinel;
@@ -233,6 +235,85 @@ append_dev_data(cJSON *json)
     return 0;
 }
 
+char *order_dev_json_str(cJSON *json)
+{
+    long ori_len = 1024*1024;
+    char *out = (char*)malloc(ori_len);
+    cJSON *item = NULL;
+    int size = 0;
+    int len = 0;
+    int i = 0;
+    char *t = NULL;
+    if(!out)
+        return NULL;
+
+    size = cJSON_GetArraySize(json);
+    blog(LOG_DEBUG, "record items:%d", size);
+    sprintf(out, "[");
+    len ++;
+    for(i = 0; i < size; i++){
+        if(!(item = cJSON_GetArrayItem(json, i))){
+            blog(LOG_ERR, "get item %d fail", i);
+            continue;
+        }
+        if(len < ori_len - 1024*2){
+            ori_len *= 2;
+            if(!(t = realloc(out, ori_len))){
+                blog(LOG_ERR, "oom");
+                free(out);
+                return NULL;
+            }
+            out = t;
+        }
+        if(i){
+            sprintf(out + len, ",");
+            len ++;
+        }
+        len += sprintf(out + len, 
+                "{\"EQUIPMENT_NUM\":\"%s\","
+                "\"EQUIPMENT_NAME\":\"%s\","
+                "\"MAC\":\"%s\","
+                "\"IP\":0,"
+                "\"SECURITY_FACTORY_ORGCODE\":\"%s\","
+                "\"VENDOR_NAME\":\"\","
+                "\"VENDOR_NUM\":\"\","
+                "\"SERVICE_CODE\":\"%s\","
+                "\"PROVINCE_CODE\":\"%s\","
+                "\"CITY_CODE\":\"%s\","
+                "\"AREA_CODE\":\"%s\","
+                "\"INSTALL_DATE\":\"\","
+                "\"INSTALL_POINT\":\"\","
+                "\"EQUIPMENT_TYPE\":\"%s\","
+                "\"LONGITUDE\":\"\","
+                "\"LATITUDE\":\"\","
+                "\"SUBWAY_STATION\":\"\","
+                "\"SUBWAY_LINE_INFO\":\"\","
+                "\"SUBWAY_VEHICLE_INFO\":\"\","
+                "\"SUBWAY_COMPARTMENT_NUM\":\"\","
+                "\"CAR_CODE\":\"\","
+                "\"UPLOAD_TIME_INTERVAL\":0,"
+                "\"COLLECTION_RADIUS\":0,"
+                "\"CREATE_TIME\":\"%s\","
+                "\"CREATER\":\"\","
+                "\"LAST_CONNECT_TIME\":\"\","
+                "\"REMARK\":\"\","
+                "\"WDA_VERSION\":\"\","
+                "\"FIRMWARE_VERSION\":\"\"}",
+                (cJSON_GetObjectItem(item, "EQUIPMENT_NUM"))->valuestring,
+                (cJSON_GetObjectItem(item, "EQUIPMENT_NAME"))->valuestring,
+                (cJSON_GetObjectItem(item, "MAC"))->valuestring,
+                (cJSON_GetObjectItem(item, "SECURITY_FACTORY_ORGCODE"))->valuestring,
+                (cJSON_GetObjectItem(item, "SERVICE_CODE"))->valuestring,
+                (cJSON_GetObjectItem(item, "PROVINCE_CODE"))->valuestring,
+                (cJSON_GetObjectItem(item, "CITY_CODE"))->valuestring,
+                (cJSON_GetObjectItem(item, "AREA_CODE"))->valuestring,
+                (cJSON_GetObjectItem(item, "EQUIPMENT_TYPE"))->valuestring,
+                (cJSON_GetObjectItem(item, "CREATE_TIME"))->valuestring
+                    );
+    }
+    sprintf(out + len, "]");
+    return out;
+}
 
 int
 dev_init()
@@ -316,14 +397,12 @@ next:
             blog(LOG_DEBUG, "handle json of :%s", json_map[i].area);
             if(cJSON_GetArraySize(json_map[i].json) > 0){
                 //save to temp file
-                if(!(out = cJSON_PrintUnformatted(json))){
-                    blog(LOG_ERR, "failed to get json out");
-                } else {
-                    if(buf_to_file(tmp_file, out, strlen(out))){
+                if((out = order_dev_json_str(json_map[i].json))){
+                    if(buf_to_file(TMP_DEV_FILE, out, strlen(out))){
                         blog(LOG_ERR, "save json out file failed");
                     } else {
                         //generate to output dir
-                        if(putfile_to_output(tmp_file, PA_TYPE_SBZL, json_map[i].area)){
+                        if(putfile_to_output(TMP_DEV_FILE, PA_TYPE_SBZL, json_map[i].area)){
                             blog(LOG_ERR, "failed to put file to putput");
                         }
                     }

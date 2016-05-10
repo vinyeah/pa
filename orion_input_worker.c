@@ -14,6 +14,8 @@
 extern int terminate;
 extern struct app_config *cfg;
 
+#define TMP_STA_FILE  "/tmp/.pa_tmp_STA"
+
 #define TMP_HANDLE_DIR "/tmp/.pa_temp_handle"
 #define TMP_INPUT_DIR "/tmp/.pa_tmp_input"
 #define READED_FLAG_FILE    "./.readed"
@@ -169,14 +171,16 @@ handle_input_line(char *buf, struct handle_param *hparam)
     char mac[6] = {0};
     char apmacstr[13] = {0};
     char stamac[6] = {0};
-    char stamacstr[18] = {0};
+    char stamacstr[13] = {0};
+    char stamacstr_dash[18] = {0};
     cJSON *json = NULL;
     cJSON *item = NULL;
     cJSON *obj = NULL;
     int i = 0;
     struct mac_node *mn = NULL;
     long t = 0;
-    char *out = NULL;
+    char out[1024*2] = {0};
+    int len = 0;
     long uptime = 0;
     char act = 0;
 
@@ -222,13 +226,11 @@ handle_input_line(char *buf, struct handle_param *hparam)
     blog(LOG_DEBUG, "got dest dev by mac");
     memcpy(mac, mn->mac, 6);
 
-    if(!(item = cJSON_CreateObject()))
-        goto fail;
-
     if(!(obj = cJSON_GetObjectItem(json, "hmac")) || !obj->valuestring || strlen(obj->valuestring) <= 0)
         goto fail;
     tc_str2mac(obj->valuestring, stamac);
-    tc_mac2str(stamac, stamacstr, '-');
+    tc_mac2str(stamac, stamacstr_dash, '-');
+    tc_mac2str(stamac, stamacstr, 0);
 
     if(!(obj = cJSON_GetObjectItem(json, "ts")))
         goto fail;
@@ -237,67 +239,59 @@ handle_input_line(char *buf, struct handle_param *hparam)
     if((obj = cJSON_GetObjectItem(json, "huptime")) && obj->valuestring && strlen(obj->valuestring))
         uptime = atoi(obj->valuestring);
 
-    cJSON_AddStringToObject(item, "SERVICE_CODE", mn->service_code);
-    cJSON_AddStringToObject(item, "USER_NAME", "");
-    cJSON_AddStringToObject(item, "CERTIFICATE_TYPE", "");
-    cJSON_AddStringToObject(item, "CERTIFICATE_CODE", "");
+    sprintf(out, "{");
+    len ++;
+    len += sprintf(out + len, "\"SERVICE_CODE\":\"%s\"", mn->service_code);
+    len += sprintf(out + len, ",\"USER_NAME\":\"\"");
+    len += sprintf(out + len, ",\"CERTIFICATE_TYPE\":\"\"");
+    len += sprintf(out + len, ",\"CERTIFICATE_CODE\":\"\"");
+
     if(act == 'O'){
-        cJSON_AddNumberToObject(item, "ONLINE_TIME", t);
-        cJSON_AddNumberToObject(item, "OFFLINE_TIME", 0);
+        len += sprintf(out + len, ",\"ONLINE_TIME\":%ld", t);
+        len += sprintf(out + len, ",\"OFFLINE_TIME\":0");
     } else {
-        cJSON_AddNumberToObject(item, "ONLINE_TIME", t - uptime);
-        cJSON_AddNumberToObject(item, "OFFLINE_TIME", t);
+        len += sprintf(out + len, ",\"ONLINE_TIME\":%ld", t - uptime);
+        len += sprintf(out + len, ",\"OFFLINE_TIME\":%ld", t);
     }
     if(!(obj = cJSON_GetObjectItem(json, "hname")) || !obj->valuestring || strlen(obj->valuestring) <= 0)
         goto fail;
-    cJSON_AddStringToObject(item, "NET_ENDING_NAME", obj->valuestring);
+    len += sprintf(out + len, ",\"NET_ENDING_NAME\":\"%s\"", obj->valuestring);
     t = 0;
     if((obj = cJSON_GetObjectItem(json, "hip")) && obj->valuestring)
         t = tc_str2ip(obj->valuestring);
-    cJSON_AddNumberToObject(item, "NET_ENDING_IP", t);
-    cJSON_AddStringToObject(item, "NET_ENDING_MAC", stamacstr);
-    cJSON_AddStringToObject(item, "ORG_NAME", "");
-    cJSON_AddStringToObject(item, "COUNTRY", "");
-    cJSON_AddStringToObject(item, "NOTE", "");
+    len += sprintf(out + len, ",\"NET_ENDING_IP\":%ld", t);
+    len += sprintf(out + len, ",\"NET_ENDING_MAC\":\"%s\"", stamacstr_dash);
+    len += sprintf(out + len, ",\"ORG_NAME\":\"\"");
+    len += sprintf(out + len, ",\"COUNTRY\":\"\"");
+    len += sprintf(out + len, ",\"NOTE\":\"\"");
     sprintf(buf, "%s%s%ld", mn->service_code, stamacstr, uptime);
-    cJSON_AddStringToObject(item, "SESSION_ID", buf);
-    cJSON_AddStringToObject(item, "MOBILE_PHONE", "");
-    cJSON_AddNumberToObject(item, "SRC_V4_IP", 0);
-    cJSON_AddStringToObject(item, "SRC_V6_IP", "");
-    cJSON_AddNumberToObject(item, "SRC_V4START_PORT", 0);
-    cJSON_AddNumberToObject(item, "SRC_V4END_PORT", 0);
-    cJSON_AddNumberToObject(item, "SRC_V6START_PORT", 0);
-    cJSON_AddNumberToObject(item, "SRC_V6END_PORT", 0);
-    cJSON_AddStringToObject(item, "AP_NUM", mn->ap_num);
-    cJSON_AddStringToObject(item, "AP_MAC", mn->macstr_dash);
-    cJSON_AddStringToObject(item, "AP_XPOINT", "");
-    cJSON_AddStringToObject(item, "AP_YPOINT", "");
-    cJSON_AddStringToObject(item, "POWER", "");
-    cJSON_AddStringToObject(item, "XPOINT", "");
-    cJSON_AddStringToObject(item, "YPOINT", "");
-    cJSON_AddStringToObject(item, "AUTH_TYPE", "");
-    cJSON_AddStringToObject(item, "AUTH_CODE", "");
-    cJSON_AddStringToObject(item, "COMPANY_ID", cfg->org_code);
-
-    if(!(out = cJSON_PrintUnformatted(item))){
-        blog(LOG_ERR, "print json error");
-        goto fail;
-    }
-    blog(LOG_DEBUG, "save to temp file");
+    len += sprintf(out + len, ",\"SESSION_ID\":\"%s\"", buf);
+    len += sprintf(out + len, ",\"MOBILE_PHONE\":\"\"");
+    len += sprintf(out + len, ",\"SRC_V4_IP\":0");
+    len += sprintf(out + len, ",\"SRC_V6_IP\":\"\"");
+    len += sprintf(out + len, ",\"SRC_V4START_PORT\":0");
+    len += sprintf(out + len, ",\"SRC_V4END_PORT\":0");
+    len += sprintf(out + len, ",\"SRC_V6START_PORT\":0");
+    len += sprintf(out + len, ",\"SRC_V6END_PORT\":0");
+    len += sprintf(out + len, ",\"AP_NUM\":\"%s\"", mn->ap_num);
+    len += sprintf(out + len, ",\"AP_MAC\":\"%s\"", mn->macstr_dash);
+    len += sprintf(out + len, ",\"AP_XPOINT\":\"\"");
+    len += sprintf(out + len, ",\"AP_YPOINT\":\"\"");
+    len += sprintf(out + len, ",\"POWER\":\"\"");
+    len += sprintf(out + len, ",\"XPOINT\":\"\"");
+    len += sprintf(out + len, ",\"YPOINT\":\"\"");
+    len += sprintf(out + len, ",\"AUTH_TYPE\":\"\"");
+    len += sprintf(out + len, ",\"AUTH_CODE\":\"\"");
+    len += sprintf(out + len, ",\"COMPANY_ID\":\"%s\"", cfg->org_code);
+    sprintf(out + len, "}");
     write_temp_handle_file(PA_TYPE_SJRZ, out, hparam);
 
     blog(LOG_DEBUG, "handle record finished");
     cJSON_Delete(json);
-    cJSON_Delete(item);
-    free(out);
     return 0;
 fail:
     if(json)
         cJSON_Delete(json);
-    if(item)
-        cJSON_Delete(item);
-    if(out)
-        free(out);
     return -1;
 }
 
