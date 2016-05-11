@@ -100,7 +100,7 @@ place_init()
 
 #else
 
-#define PLACE_BATCH_NUM 100
+#define PLACE_BATCH_NUM 4000
 
 char *order_place_json_str(cJSON *json, int id)
 {

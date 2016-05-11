@@ -236,7 +236,7 @@ append_dev_data(cJSON *json)
 }
 
 
-#define DEV_BATCH_NUM 100
+#define DEV_BATCH_NUM 4000
 
 int order_dev_json_str(char *fname, cJSON *json, int id)
 {

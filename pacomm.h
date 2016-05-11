@@ -14,6 +14,7 @@
 #define PA_TYPE_CSZL   "008"
 #define PA_TYPE_SBZL   "010"
 #define PA_TYPE_SJRZ   "005"
+#define PA_TYPE_CSZT   "009"
 
 #define PA_INTERVAL     300
 
