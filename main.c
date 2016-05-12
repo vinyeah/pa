@@ -78,26 +78,6 @@ main(int argc, char **argv)
 
     eloop_init(1024);
 
-
-    /*--------------------------------------------------------------------*/
-    int sock = -1;
-    int ret = 0;
-        if((sock = ftp_connect("log.bhunetworks.com", 21, "ftpdlog", "ftpBhu8273")) == BHU_INVALID_SOCKET){
-                    blog(LOG_ERR, "failed to connect to ftp server:%s", cfg->server);
-                            return -1;
-                                }
-
-            if((ret = ftp_storfile_by_port(sock, "/home/yetao/FileZilla_3.17.0.1_src.tar.bz2", "hello", NULL, NULL)) != 0){
-                        blog(LOG_ERR, "failed to put file to server");
-                                goto fail;
-                                    }
-
-
-    if(1)
-        return 0;
-    /*--------------------------------------------------------------------*/
-
-
     if(ctrl_init(cfg)){
         blog(LOG_ERR, "create ctrl listen sock failed");
     }

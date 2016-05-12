@@ -14,6 +14,12 @@
 #include "comm.h"
 #include "ftp.h"
 
+void set_sock_timeout(int s)
+{
+    struct timeval timeo = {15, 0};
+    setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &timeo, sizeof(timeo));
+    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeo, sizeof(timeo));
+}
 int socket_connect(char *host,int port)
 {
     struct sockaddr_in address;
@@ -30,9 +36,7 @@ int socket_connect(char *host,int port)
         return -1;
     }
      
-    struct timeval timeo = {15, 0};
-    setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &timeo, sizeof(timeo));
-    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeo, sizeof(timeo));
+    set_sock_timeout(s);
      
     address.sin_family = AF_INET;
     address.sin_port = htons((unsigned short)port);
@@ -103,11 +107,13 @@ int ftp_sendcmd( int sock, char *cmd )
     int      result;
     ssize_t  len;
      
+//    blog(LOG_DEBUG, "ftp_cmd:[%s]", cmd);
     result = ftp_sendcmd_re(sock, cmd, buf, &len);
     if (result == 0)
     {
         sscanf( buf, "%d", &result );
     }
+//    blog(LOG_DEBUG, "result:[%s]", buf);
      
     return result;
 }
@@ -158,6 +164,8 @@ int create_datasock( int ctrl_sock )
         return -1;
     }
     port = sin.sin_port;
+
+    blog(LOG_DEBUG, "listen on :%d\n", ntohs(port));
      
     if( getsockname( ctrl_sock, (struct sockaddr *)&sin, (socklen_t *)&len ) == -1 )
     {
@@ -170,7 +178,7 @@ int create_datasock( int ctrl_sock )
             (sin.sin_addr.s_addr&0x0000FF00)>>8,
             (sin.sin_addr.s_addr&0x00FF0000)>>16,
             (sin.sin_addr.s_addr&0xFF000000)>>24,
-            port>>8, port&0xff );
+            port&0xff, port>>8);
      
     if ( ftp_sendcmd( ctrl_sock, cmd ) != 200 ) {
         close( lsn_sock );
@@ -369,29 +377,38 @@ int ftp_storfile_by_port( int c_sock, char *s, char *d ,unsigned long long *stor
     int ret = -1;
      
     handle = open( s,  O_RDONLY);
-    if ( handle == -1 ) return -1;
+    if ( handle == -1 ){
+        blog(LOG_ERR, "open file :%s failed", s);
+        return -1;
+    }
      
     ftp_type(c_sock, 'I');
      
     lsn_sock = create_datasock(c_sock);
-    if (lsn_sock == -1)
-    {
+    if (lsn_sock == -1){
+        blog(LOG_ERR, "create listen sock for data transfer failed");
         goto fail;
     }
+    blog(LOG_DEBUG, "got listen sock");
+
+    set_sock_timeout(lsn_sock);
 
     bzero(buf, sizeof(buf));
     sprintf( buf, "STOR %s\r\n", d );
     send_re = ftp_sendcmd( c_sock, buf );
     if (send_re >= 300 || send_re == 0)
     {
-        close(handle);
-        return send_re;
-    }
-
-    if((d_sock = accept(lsn_sock, NULL, 0))){
+        ret = send_re;
         goto fail;
     }
-     
+
+    if((d_sock = accept(lsn_sock, NULL, 0)) == -1){
+        blog(LOG_ERR, "accept fail, %s", strerror(errno));
+        goto fail;
+    }
+    blog(LOG_DEBUG, "accepted server incoming connection");
+
+    set_sock_timeout(d_sock);
      
     bzero(buf, sizeof(buf));
     while ( (len = read( handle, buf, 512)) > 0)
@@ -400,6 +417,7 @@ int ftp_storfile_by_port( int c_sock, char *s, char *d ,unsigned long long *stor
         if (send_len != len ||
             (stop != NULL && *stop))
         {
+            blog(LOG_ERR, "send file err:%d, %s", send_len, strerror(errno));
             goto fail;
         }
          
@@ -409,6 +427,11 @@ int ftp_storfile_by_port( int c_sock, char *s, char *d ,unsigned long long *stor
         }
     }
 
+    blog(LOG_DEBUG, "file data transfer finished");
+    if(d_sock != -1){
+        close(d_sock);
+        d_sock = -1;
+    }
     bzero(buf, sizeof(buf));
     len = recv( c_sock, buf, 512, 0 );
     buf[len] = 0;
@@ -419,12 +442,13 @@ int ftp_storfile_by_port( int c_sock, char *s, char *d ,unsigned long long *stor
         ret = 0;
     }
 fail:
-    if(d_sock != -1)
-        close(d_sock);
     if(lsn_sock != -1)
         close(lsn_sock);
     if(handle!= -1)
         close(handle);
+    if(d_sock != -1)
+        close(d_sock);
+    blog(LOG_DEBUG, "transfer result:%d", ret);
     return ret;
 }
 
