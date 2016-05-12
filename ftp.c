@@ -81,13 +81,13 @@ int connect_server( char *host, int port )
  
 int ftp_sendcmd_re( int sock, char *cmd, void *re_buf, ssize_t *len)
 {
-    char        buf[512];
+    char        buf[8291];
     ssize_t     r_len;
      
     if ( send( sock, cmd, strlen(cmd), 0 ) == -1 )
         return -1;
      
-    r_len = recv( sock, buf, 512, 0 );
+    r_len = recv( sock, buf, sizeof(buf) - 1, 0 );
     if ( r_len < 1 ) return -1;
     buf[r_len] = 0;
      
@@ -356,6 +356,78 @@ int ftp_retrfile( int c_sock, char *s, char *d ,unsigned long long *stor_size, i
     }
     return 0;
 }
+
+int ftp_storfile_by_port( int c_sock, char *s, char *d ,unsigned long long *stor_size, int *stop)
+{
+    int     d_sock = -1;
+    int     lsn_sock = -1;
+    ssize_t     len,send_len;
+    char    buf[512];
+    int     handle = -1;
+    int send_re;
+    int result;
+    int ret = -1;
+     
+    handle = open( s,  O_RDONLY);
+    if ( handle == -1 ) return -1;
+     
+    ftp_type(c_sock, 'I');
+     
+    lsn_sock = create_datasock(c_sock);
+    if (lsn_sock == -1)
+    {
+        goto fail;
+    }
+
+    bzero(buf, sizeof(buf));
+    sprintf( buf, "STOR %s\r\n", d );
+    send_re = ftp_sendcmd( c_sock, buf );
+    if (send_re >= 300 || send_re == 0)
+    {
+        close(handle);
+        return send_re;
+    }
+
+    if((d_sock = accept(lsn_sock, NULL, 0))){
+        goto fail;
+    }
+     
+     
+    bzero(buf, sizeof(buf));
+    while ( (len = read( handle, buf, 512)) > 0)
+    {
+        send_len = send(d_sock, buf, len, 0);
+        if (send_len != len ||
+            (stop != NULL && *stop))
+        {
+            goto fail;
+        }
+         
+        if (stor_size != NULL)
+        {
+            *stor_size += send_len;
+        }
+    }
+
+    bzero(buf, sizeof(buf));
+    len = recv( c_sock, buf, 512, 0 );
+    buf[len] = 0;
+    sscanf( buf, "%d", &result );
+    if ( result >= 300 ) {
+        ret = result;
+    } else {
+        ret = 0;
+    }
+fail:
+    if(d_sock != -1)
+        close(d_sock);
+    if(lsn_sock != -1)
+        close(lsn_sock);
+    if(handle!= -1)
+        close(handle);
+    return ret;
+}
+
  
 int ftp_storfile( int c_sock, char *s, char *d ,unsigned long long *stor_size, int *stop)
 {

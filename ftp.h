@@ -20,8 +20,10 @@ int ftp_list( int c_sock, char *path, void **data, unsigned long long *data_len)
 
 //下载文件
 int ftp_retrfile( int c_sock, char *s, char *d ,unsigned long long *stor_size, int *stop);
-//上传文件
+//上传文件 (passive)
 int ftp_storfile( int c_sock, char *s, char *d ,unsigned long long *stor_size, int *stop);
+//上传文件 (port)
+int ftp_storfile_by_port( int c_sock, char *s, char *d ,unsigned long long *stor_size, int *stop);
 
 //修改文件名&移动目录
 int ftp_renamefile( int c_sock, char *s, char *d );

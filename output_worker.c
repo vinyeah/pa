@@ -88,8 +88,6 @@ transfer_file(char *path, char *type, char *src_id)
         return -1;
     }
 
-    ftp_type(sock, 'I');
-
     while((s = strchr(p, '/'))){
         *s = 0;
         ftp_mkd(sock, p);
