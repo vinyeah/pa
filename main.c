@@ -4,6 +4,7 @@
 #include "orion_input_worker.h"
 #include "output_worker.h"
 #include <pthread.h>
+#include "pacomm.h"
 
 int terminate = 0;
 struct app_config *cfg = NULL;

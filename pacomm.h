@@ -11,11 +11,6 @@
 #define OUTPUT_DIR   "output"
 #define DONE_DIR   "done"
 
-#define PA_TYPE_CSZL   "008"
-#define PA_TYPE_SBZL   "010"
-#define PA_TYPE_SJRZ   "005"
-#define PA_TYPE_CSZT   "009"
-
 #define PA_INTERVAL     300
 
 
@@ -31,6 +26,25 @@
 
 
 enum {
+    PA_TYPE_WLRZ = 0,   //特征采集
+    PA_TYPE_FJFJ,   //网络虚拟身份轨迹
+    PA_TYPE_JSTX,   //即时通讯内容
+    PA_TYPE_XWRZ,   //上网日志
+    PA_TYPE_SJRZ,   //终端上下线日志
+    PA_TYPE_PTNR,   //普通内容
+    PA_TYPE_SGJZ,   //搜索关键字
+    PA_TYPE_CSZL,   //场所资料
+    PA_TYPE_CSZT,   //场所状态
+    PA_TYPE_SBZL,   //设备资料
+    PA_TYPE_JSJZT,  //终端计算机状态
+    PA_TYPE_SBGJ,   //采集设备移动轨迹
+    PA_TYPE_RZSJ,   //认证数据
+    PA_TYPE_SJTZ,   //手机特征数据
+    PA_TYPE_PNFJ,   //普通内容附件
+};
+
+
+enum {
     FLUSH_MODE_AUTO = 0,
     FLUSH_MODE_TIME,
     FLUSH_MODE_FORCE,
@@ -41,8 +55,19 @@ struct json_map {
     cJSON *json;
 };
 
+
+struct audit_type {
+    char *type;
+    char *name;
+};
+
 int
-putfile_to_output(char *src, char *type, char *src_id);
+putfile_to_output(char *src, int type, char *src_id);
 cJSON *
 get_json_map(struct json_map *map, char *area);
+int
+get_audit_id_by_type(char *type);
+
+
+extern struct audit_type audit_type_array[];
 #endif

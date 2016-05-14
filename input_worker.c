@@ -44,7 +44,7 @@ begin_handle(struct handle_param *hparam)
     int i = 0;
     memset(hparam, 0, sizeof(*hparam));
     call_system("mkdir -p "TMP_HANDLE_DIR);
-    sprintf(buf, "%s/%s", TMP_HANDLE_DIR, PA_TYPE_SJRZ);
+    sprintf(buf, "%s/%s", TMP_HANDLE_DIR, audit_type_array[PA_TYPE_SJRZ].type);
     if((f = fopen(buf, "r"))){
         while(fgets(buf, sizeof(buf), f)){
             hparam->sta_count ++;
@@ -92,7 +92,7 @@ flush_temp_input(struct handle_param *hparam, char *type, int mode)
     return 0;
 do_flush:
     if(!type)
-        type = (char*)PA_TYPE_SJRZ;
+        type = audit_type_array[PA_TYPE_SJRZ].type;
     sprintf(buf, "%s/%s", TMP_HANDLE_DIR, type);
     if(!(ret = putfile_to_output(buf, PA_TYPE_SJRZ, cfg->src_id))){
         hparam->sta_count = 0;

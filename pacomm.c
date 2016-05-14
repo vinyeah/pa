@@ -4,17 +4,48 @@
 #include "pacomm.h"
 #include "config.h"
 
+
 extern struct app_config *cfg;
+
+struct audit_type audit_type_array[] = {
+    [PA_TYPE_WLRZ] = { .type = "001", .name = "WLRZ" },
+    [PA_TYPE_FJFJ] = { .type = "002", .name = "FJGJ" },
+    [PA_TYPE_JSTX] = { .type = "003", .name = "JSTX" },
+    [PA_TYPE_XWRZ] = { .type = "004", .name = "XWRZ" },
+    [PA_TYPE_SJRZ] = { .type = "005", .name = "SJRZ" },
+    [PA_TYPE_PTNR] = { .type = "006", .name = "PTNR" },
+    [PA_TYPE_SGJZ] = { .type = "007", .name = "SGJZ" },
+    [PA_TYPE_CSZL] = { .type = "008", .name = "CSZL" },
+    [PA_TYPE_CSZT] = { .type = "009", .name = "CSZT" },
+    [PA_TYPE_SBZL] = { .type = "010", .name = "SBZL" },
+    [PA_TYPE_JSJZT] = { .type = "011", .name = "JSJZT" },
+    [PA_TYPE_SBGJ] = { .type = "012", .name = "SBGJ" },
+    [PA_TYPE_RZSJ] = { .type = "013", .name = "RZSJ" },
+    [PA_TYPE_SJTZ] = { .type = "014", .name = "SJTZ" },
+    [PA_TYPE_PNFJ] = { .type = "999", .name = "PNFJ" },
+};
+
+int
+get_audit_id_by_type(char *type)
+{
+    int i = 0;
+    for(i = 0; i < sizeof(audit_type_array)/sizeof(audit_type_array[0]); i ++){
+        if(strcmp(audit_type_array[i].type, type) == 0)
+            return i;
+    }
+    return -1;
+}
 
 
 
 int
-putfile_to_output(char *src, char *type, char *src_id)
+putfile_to_output(char *src, int type, char *src_id)
 {
     char dbuf[512] = {0}; 
     char buf[1024] = {0};
     char tbuf[32] = {0};
     char uuid[38] = {0};
+    char *typestr = audit_type_array[type].type;
 
     struct tm * tm;
     time_t tt = time(NULL);
@@ -23,9 +54,9 @@ putfile_to_output(char *src, char *type, char *src_id)
     blog(LOG_DEBUG, "adding file to output path");
 
 
-    printf("[%s][%s][%s]\n", src, type, src_id);
+    printf("[%s][%s][%s]\n", src, typestr, src_id);
 
-    sprintf(dbuf, "%s/"OUTPUT_DIR"/%s/", cfg->data_path, type);
+    sprintf(dbuf, "%s/"OUTPUT_DIR"/%s/", cfg->data_path, typestr);
     tm = localtime(&tt); 
     strftime(tbuf, sizeof(tbuf) - 1, "%Y%m%d%H%M%S", tm);
 #if 0

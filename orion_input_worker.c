@@ -52,7 +52,7 @@ begin_handle(struct handle_param *hparam)
     int i = 0;
     memset(hparam, 0, sizeof(*hparam));
     call_system("mkdir -p "TMP_HANDLE_DIR);
-    sprintf(buf, "%s/%s", TMP_HANDLE_DIR, PA_TYPE_SJRZ);
+    sprintf(buf, "%s/%s", TMP_HANDLE_DIR, audit_type_array[PA_TYPE_SJRZ].type);
     if((f = fopen(buf, "r"))){
         while(fgets(buf, sizeof(buf), f)){
             hparam->sta_count ++;
@@ -91,8 +91,9 @@ _do_flush_temp_input(struct handle_param *hparam, char *type)
     int len = 0;
     int i = 0;
     int j = 0;
-    if(!type)
-        type = (char*)PA_TYPE_SJRZ;
+    if(!type){
+        type = audit_type_array[PA_TYPE_SJRZ].type;
+    }
     sprintf(buf, "%s/%s", TMP_HANDLE_DIR, type);
     if(!(f = fopen(TMP_JSON_FILE, "w")))
         goto out;
@@ -147,15 +148,15 @@ flush_temp_input(struct handle_param *hparam, char *type, int mode)
 
 
 static int
-write_temp_handle_file(char *type, char *out, struct handle_param *hparam)
+write_temp_handle_file(int type, char *out, struct handle_param *hparam)
 {
     char buf[512] = {0};
-    sprintf(buf, "%s/%s", TMP_HANDLE_DIR, type);
+    sprintf(buf, "%s/%s", TMP_HANDLE_DIR, audit_type_array[type].type);
     if(append_buf_to_file(buf, out)){
         blog(LOG_ERR, "write data to temp file error");
         return -1;
     }
-    return flush_temp_input(hparam, type, FLUSH_MODE_AUTO);
+    return flush_temp_input(hparam, audit_type_array[type].type, FLUSH_MODE_AUTO);
 }
 
 /*
