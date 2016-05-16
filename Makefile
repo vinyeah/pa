@@ -15,8 +15,7 @@ endif
 
 .PHONY: all clean install
 
-BASE_OBJS=cJSON.o comm.o config.o crc.o eloop.o inifile.o rbtree.o ctrl.o ftp.o dev.o place.o pacomm.o output_worker.o devmap.o orion_input_worker.o
-#input_worker.o
+BASE_OBJS=cJSON.o comm.o config.o crc.o eloop.o inifile.o rbtree.o ctrl.o ftp.o dev.o place.o pacomm.o output_worker.o devmap.o orion_input_worker.o input_worker.o sta_sniffer_worker.o
 
 TARGETS?=pa_server
 

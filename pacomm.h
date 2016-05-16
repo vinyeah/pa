@@ -18,11 +18,18 @@
 #define GATHER_TYPE     "139"   //wifi
 #define BATCH_NUM       100
 #define BATCH_TIME      300
-#define NGX_LOG_SWITH   60
-#define NGX_LOG_NAME    "pa.access.log"
+#define NGX_LOG_SWITH   300
+#define NGX_LOG_FLUSH   10
 
 
 #define JSON_MAP_SIZE   30
+
+
+enum {
+    NGX_LOG_STA_SNIFFER = 0,
+    NGX_LOG_OTHER,
+    NGX_LOG_MAX,
+};
 
 
 enum {
@@ -41,6 +48,7 @@ enum {
     PA_TYPE_RZSJ,   //认证数据
     PA_TYPE_SJTZ,   //手机特征数据
     PA_TYPE_PNFJ,   //普通内容附件
+    PA_TYPE_MAX
 };
 
 
@@ -61,6 +69,11 @@ struct audit_type {
     char *name;
 };
 
+struct handle_param {
+    int count;
+    time_t start;
+};
+
 int
 putfile_to_output(char *src, int type, char *src_id);
 cJSON *
@@ -68,6 +81,17 @@ get_json_map(struct json_map *map, char *area);
 int
 get_audit_id_by_type(char *type);
 
+int 
+ngx_begin_handle();
+int 
+ngx_end_handle();
+void
+ngx_input_worker(int ngx_log_type, void *(*line_callback)(char *line));
+void
+switch_ngx_log(void *arg);
+int
+ngx_write_temp_handle_file(int type, char *out);
 
 extern struct audit_type audit_type_array[];
+extern struct handle_param handle_param_array[];
 #endif

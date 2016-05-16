@@ -1,13 +1,12 @@
 #include "comm.h"
 #include "config.h"
 #include "ctrl.h"
-#include "orion_input_worker.h"
+#include "input_worker.h"
 #include "output_worker.h"
-#include <pthread.h>
 #include "pacomm.h"
 
-int terminate = 0;
 struct app_config *cfg = NULL;
+int terminate = 0;
 
 
 #ifdef __MINGW32__
@@ -45,7 +44,6 @@ main(int argc, char **argv)
 {
     char *confile = NULL;
     int c;
-    pthread_t input_thread_id = -1;
     pthread_t output_thread_id = -1;
 
     while (-1 != (c = getopt(argc, argv, "vVhc:"))) {
@@ -89,13 +87,13 @@ main(int argc, char **argv)
     if(dev_init()){
         goto fail;
     }
-
-    blog(LOG_DEBUG, "creating orion input worker thread");
-    if(pthread_create(&input_thread_id, NULL, pa_orion_input_worker, NULL) != 0){
-        blog(LOG_ERR, "failed to creat thread");
+    if(place_status_init()){
         goto fail;
     }
-    pthread_detach(input_thread_id);
+
+    if(input_worker_init()){
+        goto fail;
+    }
 
     blog(LOG_DEBUG, "creating output worker thread");
     if(pthread_create(&output_thread_id, NULL, pa_output_worker, NULL) != 0){
@@ -103,7 +101,6 @@ main(int argc, char **argv)
         goto fail;
     }
     pthread_detach(output_thread_id);
-
 
     eloop_run();
     return 0;

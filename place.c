@@ -4,6 +4,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include "comm.h"
+#include "list.h"
 #include "pacomm.h"
 #include "config.h"
 #include "place.h"
@@ -11,6 +12,7 @@
 #include "cJSON.h"
 
 extern struct app_config *cfg;
+struct list_head place_list;
 
 #define TMP_PLACE_FILE  "/tmp/.pa_tmp_place"
 
@@ -207,6 +209,157 @@ char *order_place_json_str(cJSON *json, int id)
 }
 
 
+struct place *
+load_place(char *path, cJSON **json_item)
+{
+    cJSON *item = NULL;
+    cJSON *obj = NULL;
+    char *p = NULL;
+    char *s = NULL;
+    long len = 0;
+    struct place *place = NULL;
+    struct place_list *tmp = NULL;
+    struct list_head *pl = NULL;
+    struct list_head *m = NULL;
+
+    blog(LOG_DEBUG, "loading:%s", path);
+    *json_item = NULL;
+    if(!(p = file_to_buf(path, &len))){
+        blog(LOG_ERR, "failed to load json file:%s", path);
+        return NULL;
+    }
+
+    //   blog(LOG_DEBUG, "load place from file: %s", p);
+    if(!(item = cJSON_Parse(p))){
+        blog(LOG_ERR, "failed to parse json file:%s", path);
+        goto fail;
+    }
+    if(!(s = cJSON_GetObjectItemString(item, "CITY_CODE"))){
+        blog(LOG_ERR, "no city_code");
+        goto fail;
+    }
+    list_for_each(m, &place_list){
+        tmp = list_entry(m, struct place_list, node);
+        if(strcmp(tmp->city_code, s) == 0){
+            pl = &(tmp->list);
+            break;
+        }
+    }
+    if(!pl){
+        blog(LOG_DEBUG, "create place list for :%s", s);
+        if(!(tmp = malloc(sizeof(*tmp)))){
+            blog(LOG_ERR, "oom");
+            goto fail;
+        }
+        memset(tmp, 0, sizeof(*tmp));
+        INIT_LIST_HEAD(&tmp->list);
+        safe_strncpy(tmp->city_code, s);
+        list_add_tail(&tmp->node, &place_list);
+    }
+
+    if(!(s = cJSON_GetObjectItemString(item, "SERVICE_CODE"))){
+        blog(LOG_ERR, "no service_code");
+        goto fail;
+    }
+    if(!(place = (struct place *)malloc(sizeof(*place)))){
+        blog(LOG_ERR, "oom");
+        goto fail;
+    }
+    memset(place, 0, sizeof(*place));
+    strcpy(place->service_code, s);
+    if((s = cJSON_GetObjectItemString(item, "CREATE_TIME")))
+        safe_strncpy(place->create_time, s);
+    list_add_tail(&place->node, &tmp->list);
+    free(p);
+    *json_item = item;
+    return place;
+fail:
+    if(p)
+        free(p);
+    if(item)
+        cJSON_Delete(item);
+    return NULL;
+}
+
+
+#if 0
+int
+load_dev_call_back(char *service_code)
+{
+    struct list_head *m = NULL;
+    struct list_head *n = NULL;
+    struct place *place = NULL;
+    struct place_list *pl = NULL;
+
+    list_for_each(n, &place_list){
+        pl = list_entry(n, struct place_list, node);
+        list_for_each(m, &pl->place_list){
+            place = list_entry(n, struct place, node);
+            if(strcmp(place->service_code, service_code) == 0){
+                place->ap_num ++;
+                goto out;
+            }
+        }
+    }
+out:
+    return 0;
+}
+#endif
+
+
+int
+place_status_init()
+{
+    struct list_head *m = NULL;
+    struct list_head *n = NULL;
+    struct place *place = NULL;
+    struct place_list *pl = NULL;
+    int count = 0;
+    FILE *f = NULL;
+    list_for_each(n, &place_list){
+        pl = list_entry(n, struct place_list, node);
+        if(!(f = fopen(TMP_PLACE_FILE, "w"))){
+            blog(LOG_ERR, "failed to open tmp file");
+            return -1;
+        }
+        count = 0;
+        fprintf(f, "[");
+        list_for_each(m, &pl->list){
+            place = list_entry(m, struct place, node);
+            if(place->change_flag){
+                if(count)
+                    fprintf(f, ",");
+                fprintf(f, 
+                        "{"
+                        "\"SERVICE_CODE\":\"%s\","
+                        "\"SERVICE_ONLINE_STATUS\":1,"
+                        "\"DATA_ONLINE_STATUS\":1,"
+                        "\"EQUIPMENT_RUNNING_STATUS\":1,"
+                        "\"ACTIVE_PC\":0,"
+                        "\"REPORT_PC\":0,"
+                        "\"ONLINE_PERSON\":0,"
+                        "\"VITRUAL_NUM\":0,"
+                        "\"EXT_IP\":\"\","
+                        "\"UPDATE_TIME\":\"%s\""
+                        "}",
+                        place->service_code,
+                        place->create_time
+                       );
+                count ++;
+            }
+        }
+        fprintf(f, "]");
+        fclose(f);
+        if(count){
+            if(putfile_to_output(TMP_PLACE_FILE, PA_TYPE_CSZT, pl->city_code)){
+                blog(LOG_ERR, "failed to put file to putput");
+            }
+        }
+    }
+    return 0;
+}
+
+
 int
 place_init()
 {
@@ -216,16 +369,16 @@ place_init()
     struct stat statbuf;
     cJSON *json = NULL;
     cJSON *item = NULL;
-    cJSON *obj = NULL;
     char *ft = NULL;
     char *out = NULL;
-    char *p = NULL;
     long len = 0;
     int size = 0;
     int i = 0;
     int j = 0;
+    struct place *place = NULL;
     struct json_map json_map[JSON_MAP_SIZE];
 
+    INIT_LIST_HEAD(&place_list);
 
     memset(json_map, 0, sizeof(json_map));
     blog(LOG_DEBUG, "reading config from place dir:%s", cfg->data_path);
@@ -251,39 +404,27 @@ place_init()
         if(S_ISDIR(statbuf.st_mode))
             continue;
 
+        if(!(place = load_place(buf, &item))){
+            continue;
+        }
+
         sprintf(buf, "%s/"PLACE_DIR"/%s.ok", cfg->data_path, entry->d_name);
-        if(access(buf, F_OK) == 0)
-            continue;
-
-        sprintf(buf, "%s/"PLACE_DIR"/%s", cfg->data_path, entry->d_name);
-
-        blog(LOG_DEBUG, "loading:%s", buf);
-        if(!(p = file_to_buf(buf, &len))){
-            blog(LOG_ERR, "failed to load json file");
+        if(access(buf, F_OK) == 0){
+            if(item){
+                cJSON_Delete(item);
+                item = NULL;
+            }
             continue;
         }
+        place->change_flag = 1;
 
-     //   blog(LOG_DEBUG, "load place from file: %s", p);
-        if(!(item = cJSON_Parse(p))){
-            goto next;
-        }
-
-        if(!(obj = cJSON_GetObjectItem(item, "CITY_CODE"))){
-            goto next;
-        }
-
-        if((json = get_json_map(json_map, obj->valuestring))){
+        if((json = get_json_map(json_map, cJSON_GetObjectItemString(item, "CITY_CODE")))){
             cJSON_AddItemToArray(json, item); 
         }
 
         //generate to output dir
         sprintf(buf, "touch %s/"PLACE_DIR"/%s.ok", cfg->data_path, entry->d_name);
         call_system(buf);
-next:
-        if(p){
-            free(p);
-            p = NULL;
-        }
     }
     closedir(dp);
 

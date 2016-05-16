@@ -137,6 +137,8 @@ typedef DWORD					bhu_err_t;
 #endif
 
 
+
+#define safe_strncpy(src, dest) {strncpy(src, dest, sizeof(src) - 1); src[sizeof(src) - 1] = 0;}
 typedef struct bhu_pkt_buf {
     char          *head;      /* the real start of allocated buf address */
     char          *tail;      /* the end of allocated buf address */
@@ -216,7 +218,7 @@ call_system(char *cmd);
 char *
 file_to_buf(char *path, long *len);
 int 
-append_buf_to_file(char *file, char *buf);
+append_buf_to_file(char *file, char *buf, char *delim);
 
 char *random_uuid( char buf[37] );
 char *

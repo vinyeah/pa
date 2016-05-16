@@ -14,150 +14,8 @@
 extern int terminate;
 extern struct app_config *cfg;
 
-#define TMP_STA_FILE  "/tmp/.pa_tmp_STA"
-
-#define TMP_HANDLE_DIR "/tmp/.pa_temp_handle"
 #define TMP_INPUT_DIR "/tmp/.pa_tmp_input"
-#define READED_FLAG_FILE    "./.readed"
-#define TMP_JSON_FILE  "/tmp/.pa_json_temp"
 
-
-struct handle_param {
-    int sta_count;
-    time_t start;
-};
-
-static int
-flush_temp_input(struct handle_param *hparam, char *type, int mode);
-
-static char readed_flag[64] = {0};
-
-static int
-update_readed_flag(char *s)
-{
-    FILE *f = NULL;
-    strcpy(readed_flag, s);
-    if((f = fopen(READED_FLAG_FILE, "w"))){
-        fprintf(f, "%s", readed_flag);
-        fclose(f);
-    }
-    return 0;
-}
-
-static int 
-begin_handle(struct handle_param *hparam)
-{
-    FILE *f = NULL;
-    char buf[1024*10] = {0};
-    int i = 0;
-    memset(hparam, 0, sizeof(*hparam));
-    call_system("mkdir -p "TMP_HANDLE_DIR);
-    sprintf(buf, "%s/%s", TMP_HANDLE_DIR, audit_type_array[PA_TYPE_SJRZ].type);
-    if((f = fopen(buf, "r"))){
-        while(fgets(buf, sizeof(buf), f)){
-            hparam->sta_count ++;
-        }
-        fclose(f);
-    }
-    hparam->start = time(NULL);
-
-    memset(readed_flag, 0, sizeof(readed_flag));
-    if((f = fopen(READED_FLAG_FILE, "r"))){
-        fread(readed_flag, 1, sizeof(readed_flag) - 1, f);
-        fclose(f);
-        for(i = strlen(readed_flag) - 1; i > 0; i --)
-            if(readed_flag[i] == '\r' || readed_flag[i] == '\n')
-                readed_flag[i] = 0;
-    }
-    return 0;
-}
-
-
-static int 
-end_handle(struct handle_param *hparam)
-{
-    flush_temp_input(hparam, NULL, FLUSH_MODE_FORCE);
-    return 0;
-}
-
-
-static int
-_do_flush_temp_input(struct handle_param *hparam, char *type)
-{
-    int ret = -1;
-    FILE *f = NULL;
-    FILE *f2 = NULL;
-    char buf[1024*64] = {0};
-    int len = 0;
-    int i = 0;
-    int j = 0;
-    if(!type){
-        type = audit_type_array[PA_TYPE_SJRZ].type;
-    }
-    sprintf(buf, "%s/%s", TMP_HANDLE_DIR, type);
-    if(!(f = fopen(TMP_JSON_FILE, "w")))
-        goto out;
-    if(!(f2 = fopen(buf, "r")))
-        goto out;
-    fprintf(f, "[");
-    while(fgets(buf, sizeof(buf) - 1, f2)){
-        len = strlen(buf);
-        for(j = len - 1; buf[j] == '\r' || buf[j] == '\n'; j --)buf[j] = 0;
-        if(i)
-            fprintf(f, ",");
-        fprintf(f, "%s", buf);
-        i++;
-    }
-    fprintf(f, "]");
-    fclose(f);
-    f = NULL;
-    fclose(f2);
-    f2 = NULL;
-
-    if(!(ret = putfile_to_output(TMP_JSON_FILE, PA_TYPE_SJRZ, cfg->src_id))){
-        hparam->sta_count = 0;
-        sprintf(buf, "rm -f %s/%s", TMP_HANDLE_DIR, type);
-        call_system(buf);
-    }
-    return ret;
-out:
-    if(f)
-        fclose(f);
-    if(f2)
-        fclose(f2);
-    return -1;
-}
-
-static int
-flush_temp_input(struct handle_param *hparam, char *type, int mode)
-{
-    if(mode == FLUSH_MODE_AUTO){
-        if(hparam->sta_count == 0)
-            hparam->start = time(NULL);
-        if(++hparam->sta_count >= BATCH_NUM)
-            return _do_flush_temp_input(hparam, type);
-    } if(mode == FLUSH_MODE_TIME){
-        if(hparam->sta_count && (time(NULL) - hparam->start) > BATCH_TIME){
-            return _do_flush_temp_input(hparam, type);
-        }
-    } else if(mode == FLUSH_MODE_FORCE){
-        return _do_flush_temp_input(hparam, type);
-    }
-    return 0;
-}
-
-
-static int
-write_temp_handle_file(int type, char *out, struct handle_param *hparam)
-{
-    char buf[512] = {0};
-    sprintf(buf, "%s/%s", TMP_HANDLE_DIR, audit_type_array[type].type);
-    if(append_buf_to_file(buf, out)){
-        blog(LOG_ERR, "write data to temp file error");
-        return -1;
-    }
-    return flush_temp_input(hparam, audit_type_array[type].type, FLUSH_MODE_AUTO);
-}
 
 /*
 2016-05-06 16:00:00,014 - DF{"mac":"84:82:f4:18:34:80","ts":1462521600014,"act":"DF"}
@@ -285,7 +143,7 @@ handle_input_line(char *buf, struct handle_param *hparam)
     len += sprintf(out + len, ",\"AUTH_CODE\":\"\"");
     len += sprintf(out + len, ",\"COMPANY_ID\":\"%s\"", cfg->org_code);
     sprintf(out + len, "}");
-    write_temp_handle_file(PA_TYPE_SJRZ, out, hparam);
+    ngx_write_temp_handle_file(PA_TYPE_SJRZ, out);
 
     blog(LOG_DEBUG, "handle record finished");
     cJSON_Delete(json);
@@ -336,10 +194,9 @@ pa_orion_input_worker(void *arg)
     struct handle_param hparam;
 
     blog(LOG_DEBUG, "reading orion input:%s ", cfg->orion_data_path);
-    begin_handle(&hparam);
     while(!terminate){
         for(i = 1; i <= 2; i ++){
-            sprintf(buf, "cd %s/i%d/ && ls -lt *.zip 2>/dev/null | awk '{print $9}' | tail -n 1", cfg->orion_data_path, i);
+            sprintf(buf, "cd %s/i%d/ 2>/dev/null && ls -lt *.zip 2>/dev/null | awk '{print $9}' | tail -n 1", cfg->orion_data_path, i);
             if(!(p = file_get_cmd_ex(buf))){
                 continue;
             }
@@ -363,10 +220,8 @@ pa_orion_input_worker(void *arg)
             }
             free(p);
         }
-        flush_temp_input(&hparam, NULL, FLUSH_MODE_TIME);
-        sleep(10);
+        sleep(3);
     }
-    end_handle(&hparam);
     return NULL;
 }
 

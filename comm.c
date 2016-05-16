@@ -591,12 +591,14 @@ fail:
 
 
 int 
-append_buf_to_file(char *file, char *buf)
+append_buf_to_file(char *file, char *buf, char *delim)
 {
     FILE *f = NULL;
     if(!(f = fopen(file, "a+")))
         return -1;
-    fprintf(f, "%s\n", buf);
+    if(delim)
+        fprintf(f, "%s", delim);
+    fprintf(f, "%s", buf);
     fclose(f);
     return 0;
 }
