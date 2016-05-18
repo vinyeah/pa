@@ -228,8 +228,8 @@ ngx_begin_handle()
         if((f = fopen(buf, "r"))){
             while(fgets(buf, sizeof(buf) - 1, f)){
                 buf[sizeof(buf) - 1] = 0;
-                for(i = 0; buf[i]; i ++)
-                    if(buf[i] == '}')
+                for(j = 0; buf[j]; j ++)
+                    if(buf[j] == '}')
                         handle_param_array[i].count ++;
             }
             fclose(f);
