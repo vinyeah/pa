@@ -435,6 +435,7 @@ int ftp_storfile_by_port( int c_sock, char *s, char *d ,unsigned long long *stor
     bzero(buf, sizeof(buf));
     len = recv( c_sock, buf, 512, 0 );
     buf[len] = 0;
+    blog(LOG_DEBUG, "file transfer result:[%s]", buf);
     sscanf( buf, "%d", &result );
     if ( result >= 300 ) {
         ret = result;
