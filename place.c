@@ -108,15 +108,21 @@ char *order_place_json_str(cJSON *json, int id)
 {
     char *out = (char*)malloc(1024*2*PLACE_BATCH_NUM);//ori_len*2);
     cJSON *item = NULL;
+    char tbuf[32] = {0};
     int size = 0;
     int len = 0;
     int i = 0;
+    time_t tt = time(NULL);
+
     if(!out){
         blog(LOG_ERR, "oom");
         return NULL;
     }
 
     blog(LOG_DEBUG, "id:%d", id);
+
+    strftime(tbuf, sizeof(tbuf) - 1, "%Y-%m-%d %H:%M:%S", localtime(&tt));
+
     size = cJSON_GetArraySize(json);
     blog(LOG_DEBUG, "record items:%d", size);
     sprintf(out, "[");
@@ -200,7 +206,7 @@ char *order_place_json_str(cJSON *json, int id)
                 (cJSON_GetObjectItem(item, "XPOINT"))->valuestring,
                 (cJSON_GetObjectItem(item, "YPOINT"))->valuestring,
                 cfg->org_code,
-                (cJSON_GetObjectItem(item, "CREATE_TIME"))->valuestring,
+                tbuf,
                 (cJSON_GetObjectItem(item, "CAP_TYPE"))->valuestring
                 );
     }
