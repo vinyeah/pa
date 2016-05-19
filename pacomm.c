@@ -160,7 +160,7 @@ ngx_flush_temp_input(int type, int mode)
         if(hparam->count && (time(NULL) - hparam->start) > BATCH_TIME){
             goto do_flush;
         }
-    } else if(mode == FLUSH_MODE_FORCE){
+    } else if(mode == FLUSH_MODE_FORCE && hparam->count){
         goto do_flush;
     }
     pthread_mutex_unlock(&lock);
