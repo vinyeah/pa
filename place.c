@@ -108,10 +108,10 @@ char *order_place_json_str(cJSON *json, int id)
 {
     char *out = (char*)malloc(1024*2*PLACE_BATCH_NUM);//ori_len*2);
     cJSON *item = NULL;
-    char tbuf[32] = {0};
     int size = 0;
     int len = 0;
     int i = 0;
+    char tbuf[32] = {0};
     time_t tt = time(NULL);
 
     if(!out){

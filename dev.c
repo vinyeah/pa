@@ -247,6 +247,11 @@ int order_dev_json_str(char *fname, cJSON *json, int id)
     int i = 0;
     char *t = NULL;
 
+    char tbuf[32] = {0};
+    time_t tt = time(NULL);
+
+    strftime(tbuf, sizeof(tbuf) - 1, "%Y-%m-%d %H:%M:%S", localtime(&tt));
+
     if(!(f = fopen(fname, "w"))){
         blog(LOG_ERR, "file open error!");
         return -1;
@@ -278,7 +283,7 @@ int order_dev_json_str(char *fname, cJSON *json, int id)
                 "\"PROVINCE_CODE\":\"%s\","
                 "\"CITY_CODE\":\"%s\","
                 "\"AREA_CODE\":\"%s\","
-                "\"INSTALL_DATE\":\"\","
+                "\"INSTALL_DATE\":\"%s\","
                 "\"INSTALL_POINT\":\"\","
                 "\"EQUIPMENT_TYPE\":\"%s\","
                 "\"LONGITUDE\":\"\","
@@ -292,7 +297,7 @@ int order_dev_json_str(char *fname, cJSON *json, int id)
                 "\"COLLECTION_RADIUS\":0,"
                 "\"CREATE_TIME\":\"%s\","
                 "\"CREATER\":\"\","
-                "\"LAST_CONNECT_TIME\":\"\","
+                "\"LAST_CONNECT_TIME\":\"%s\","
                 "\"REMARK\":\"\","
                 "\"WDA_VERSION\":\"\","
                 "\"FIRMWARE_VERSION\":\"\"}",
@@ -304,8 +309,10 @@ int order_dev_json_str(char *fname, cJSON *json, int id)
                 (cJSON_GetObjectItem(item, "PROVINCE_CODE"))->valuestring,
                 (cJSON_GetObjectItem(item, "CITY_CODE"))->valuestring,
                 (cJSON_GetObjectItem(item, "AREA_CODE"))->valuestring,
+                tbuf,
                 (cJSON_GetObjectItem(item, "EQUIPMENT_TYPE"))->valuestring,
-                (cJSON_GetObjectItem(item, "CREATE_TIME"))->valuestring
+                tbuf, //(cJSON_GetObjectItem(item, "CREATE_TIME"))->valuestring,
+                tbuf
                     );
     }
     fprintf(f, "]");
