@@ -17,8 +17,8 @@ touch $TMP_PA_DIR/${DEST_NAME}.ok
 
 
 ftp -n<<!
-open 211.101.24.76
-user hxlc hxlc_123456
+open log.bhunetworks.com
+user ftpdlog ftpBhu8273
 bin
 passive
 prompt
