@@ -42,3 +42,5 @@ bye
 mkdir -p ./done2
 cp $1 ./done2/$6
 
+echo hello
+
